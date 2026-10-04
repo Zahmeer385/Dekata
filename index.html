@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Dekata is a paper-trading desk for swing traders: practice long and short trades, size positions by risk, and keep a trade journal.">
+<meta name="theme-color" content="#F5ECDD">
+<title>Dekata</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400..700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky top nav, one page visible at a time (Home, Trade, Calculator, Learn); trade page is a market list beside a chart and order ticket. */
+/* Dekata brand: sand page, deep sea ink, one teal accent, wave mark. Light and dark. */
+:root{
+  --bg:#F5ECDD; --surface:#FFFDF8; --ink:#12313A; --muted:#566D75; --line:#E2D4BB;
+  --accent:#17728A; --on-accent:#FFFFFF; --gain:#0F7A4E; --loss:#C2392B; --tint:#DDEBE6;
+  --font-display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E2127; --surface:#153038; --ink:#F3EBDC; --muted:#9FB6BC; --line:#28454E;
+  --accent:#5CC3D6; --on-accent:#0E2127; --gain:#4CD6A0; --loss:#FF8F7D; --tint:#1D3F47; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E2127; --surface:#153038; --ink:#F3EBDC; --muted:#9FB6BC; --line:#28454E;
+  --accent:#5CC3D6; --on-accent:#0E2127; --gain:#4CD6A0; --loss:#FF8F7D; --tint:#1D3F47; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;padding-inline:16px}
+h1,h2,h3{font-family:var(--font-display);line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(2.3rem,7vw,4rem);font-weight:800}
+h2{font-size:clamp(1.6rem,4vw,2.3rem);font-weight:700}
+h3{font-size:1.2rem;font-weight:700}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:1080px;margin-inline:auto}
+.eyebrow{font-size:.78rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.gain{color:var(--gain)} .loss{color:var(--loss)}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px;border-radius:6px}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);margin-inline:-16px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;max-width:1080px;margin-inline:auto}
+.logo{font-family:var(--font-display);font-weight:800;font-size:1.45rem;text-decoration:none;display:flex;align-items:center;gap:8px}
+.logo svg{height:40px;width:auto;flex:none;display:block}
+.logo text{font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-.01em}
+footer .logo{display:inline-flex}
+footer .logo svg{height:34px}
+nav{display:flex;gap:6px;overflow-x:auto;margin-left:auto;max-width:100%;padding-block:2px}
+nav a{padding:8px 14px;border-radius:999px;text-decoration:none;font-weight:600;font-size:.95rem;white-space:nowrap;border:2px solid transparent}
+nav a:hover{border-color:var(--line)}
+nav a[aria-current="page"]{background:var(--accent);color:var(--on-accent)}
+
+.page{padding-block:36px 56px;display:none}
+.page.on{display:block}
+.stack{display:flex;flex-direction:column;gap:48px}
+.btn{font:inherit;font-weight:700;border:2px solid var(--ink);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:12px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn:hover{transform:translateY(-1px)}
+.btn.alt{background:transparent;color:var(--ink)}
+.btn.sm{padding:8px 14px;font-size:.9rem;border-radius:10px}
+.btn.accent{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+mark{background:linear-gradient(transparent 52%,var(--tint) 52%);color:inherit;padding:0 .08em}
+
+/* Home */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center}
+.hero-copy{display:flex;flex-direction:column;gap:20px;min-width:0}
+.hero-copy p.lead{font-size:1.15rem;color:var(--muted);max-width:34em}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step{display:flex;flex-direction:column;gap:10px;min-width:0}
+.step .n{width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-family:var(--font-display);font-weight:800}
+.step p{color:var(--muted)}
+.band{background:var(--tint);border-radius:22px;padding:28px;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.band p{max-width:40em}
+
+/* Trade */
+.banner{background:var(--tint);border-radius:12px;padding:10px 14px;font-size:.92rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner b{background:var(--ink);color:var(--bg);border-radius:999px;padding:2px 10px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{min-width:0}
+.stat .v{font-family:var(--font-display);font-weight:700;font-size:1.5rem;overflow-wrap:anywhere}
+.stat .k{font-size:.8rem;color:var(--muted);font-weight:600}
+.trade-grid{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+.market{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mk{font:inherit;text-align:left;color:inherit;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+.mk[aria-pressed="true"]{border-color:var(--ink)}
+.mk .t{font-weight:700}
+.mk .nm{font-size:.8rem;color:var(--muted)}
+.mk .pr{text-align:right}
+.mk .tag{grid-column:1/-1;font-size:.75rem;color:var(--muted)}
+.detail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.dh{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.chart{width:100%;height:auto;display:block}
+.ticket{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;font-weight:700;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-family:var(--font-mono);color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:9px 10px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--ink);outline:none}
+textarea{resize:vertical;font-family:var(--font-body)}
+.market{max-height:640px;overflow-y:auto}
+.jstats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.entries{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.entry{display:flex;flex-direction:column;gap:10px;min-width:0}
+.eh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+.plan{display:flex;flex-direction:column;gap:12px;min-width:0}
+.plan.feat{border:2px solid var(--ink)}
+.plan ul{margin:0;padding-left:18px;color:var(--muted);display:flex;flex-direction:column;gap:6px;flex:1}
+.price{font-family:var(--font-display);font-weight:800;font-size:2.1rem;line-height:1}
+.price small{font-family:var(--font-body);font-size:.85rem;font-weight:600;color:var(--muted)}
+.wl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.wl label{flex:1 1 240px}
+.hint{font-size:.9rem;color:var(--muted)}
+.msg{font-size:.92rem;font-weight:600;min-height:1.4em}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th{text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 10px 6px 0;white-space:nowrap}
+td{padding:9px 10px 9px 0;border-top:1px solid var(--line);white-space:nowrap}
+.empty{color:var(--muted);padding:6px 0}
+.pill{display:inline-block;border-radius:999px;padding:1px 10px;font-size:.78rem;font-weight:700;background:var(--tint)}
+
+/* Calculator */
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.out{display:flex;flex-direction:column;gap:14px}
+.big{font-family:var(--font-display);font-weight:800;font-size:2.6rem;line-height:1}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:.95rem}
+.kv span:nth-child(odd){color:var(--muted)}
+.rr{display:flex;height:16px;border-radius:999px;overflow:hidden;background:var(--line)}
+.rr i{display:block;height:100%}
+
+/* Learn */
+.learn{display:flex;flex-direction:column;gap:10px;max-width:760px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 18px}
+summary{cursor:pointer;font-weight:700;padding:14px 0;font-family:var(--font-display);font-size:1.1rem}
+details p{color:var(--muted);padding-bottom:16px;max-width:62ch}
+
+footer{border-top:1px solid var(--line);padding-block:24px 36px;color:var(--muted);font-size:.85rem;max-width:1080px;margin-inline:auto}
+
+@media (max-width:860px){
+  .hero,.calc{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr}
+  .trade-grid{grid-template-columns:1fr}
+  .market{flex-direction:row;overflow-x:auto;overflow-y:visible;max-height:none;padding-bottom:4px}
+  .entries,.plans{grid-template-columns:1fr}
+  .jstats{grid-template-columns:1fr 1fr}
+  .mk{min-width:170px}
+  .stats{grid-template-columns:1fr 1fr}
+  nav{margin-left:0;width:100%}
+}
+@media (max-width:520px){.ticket{grid-template-columns:1fr 1fr}.fields{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.btn:hover{transform:none}}
+.btn{transition:transform .12s}
+</style>
+
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#home" aria-label="Dekata home">
+      <svg viewBox="0 0 176 44" role="img" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="var(--accent)"/><path d="M8 24c4-9 8-9 12 0s8 9 12 0M8 15c4-6 8-6 12 0s8 6 12 0" fill="none" stroke="var(--on-accent)" stroke-width="3" stroke-linecap="round"/><text x="52" y="31" fill="currentColor">Dekata</text></svg>
+    </a>
+    <nav aria-label="Main">
+      <a href="#home" data-nav="home">Home</a>
+      <a href="#trade" data-nav="trade">Trade</a>
+      <a href="#journal" data-nav="journal">Journal</a>
+      <a href="#calculator" data-nav="calculator">Risk calculator</a>
+      <a href="#learn" data-nav="learn">Learn</a>
+      <a href="#pricing" data-nav="pricing">Pricing</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- HOME -->
+<section class="page" id="page-home">
+  <div class="stack">
+    <div class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Swing trading, made calmer</span>
+        <h1>Plan the trade. <mark>Let it swing.</mark></h1>
+        <p class="lead">Dekata is a place to trade multi-day moves. Pick a setup, size the position by what you are willing to lose, set your stop and target, then check back when the market has done its thing.</p>
+        <div class="row">
+          <a class="btn accent" href="#trade">Start paper trading</a>
+          <a class="btn alt" href="#calculator">Size a position</a>
+        </div>
+        <p class="hint">Practice account with $25,000 of play money. Prices are simulated examples.</p>
+      </div>
+      <div class="card" aria-label="Example trade">
+        <div class="dh"><div><div class="eyebrow">Example setup</div><h3>Pullback in an uptrend</h3></div><span class="pill" id="hero-rr"></span></div>
+        <svg class="chart" id="hero-chart" viewBox="0 0 520 280" role="img" aria-label="Price chart with entry, stop and target levels"></svg>
+      </div>
+    </div>
+
+    <div>
+      <h2 style="margin-bottom:20px">Three steps per trade</h2>
+      <div class="steps">
+        <div class="card step"><div class="n">1</div><h3>Find a setup</h3><p>Scan the market list for stocks pulling back inside an uptrend or pressing against recent highs.</p></div>
+        <div class="card step"><div class="n">2</div><h3>Plan the exit first</h3><p>Choose a stop and a target before you buy. Dekata sizes the position so a stop-out costs the percent of your account you picked.</p></div>
+        <div class="card step"><div class="n">3</div><h3>Review the result</h3><p>Every closed trade is logged with its profit or loss and its R multiple, so you can see what is working.</p></div>
+      </div>
+    </div>
+
+    <div class="band">
+      <div><h3>Real-money trading is on the roadmap</h3><p class="hint" style="margin-top:6px">Live orders will run through a licensed broker you connect. Until then, practice here with the same tools.</p></div>
+      <a class="btn" href="#pricing">See draft plans</a>
+    </div>
+  </div>
+</section>
+
+<!-- TRADE -->
+<section class="page" id="page-trade">
+  <div class="stack" style="gap:20px">
+    <div class="banner"><b>Paper trading</b><span>Simulated prices and play money. Nothing here is a real order or financial advice.</span></div>
+
+    <div class="card stats" id="stats"></div>
+
+    <div class="trade-grid">
+      <div>
+        <div class="eyebrow" style="margin-bottom:8px">Market list</div>
+        <div class="market" id="market"></div>
+      </div>
+
+      <div class="detail">
+        <div class="card">
+          <div class="dh"><div><h3 id="sel-name"></h3><div class="hint" id="sel-tag"></div></div><div class="mono" style="font-size:1.4rem;font-weight:500" id="sel-price"></div></div>
+          <svg class="chart" id="chart" viewBox="0 0 640 270" role="img" aria-label="Price chart for the selected stock"></svg>
+        </div>
+
+        <div class="card" style="display:flex;flex-direction:column;gap:14px">
+          <div class="dh"><h3>Order ticket</h3><span class="hint">One position per stock</span></div>
+          <div class="ticket">
+            <label for="t-side">Direction
+              <select id="t-side"><option value="1" selected>Buy (long)</option><option value="-1">Sell short</option></select></label>
+            <label for="t-risk">Risk per trade
+              <select id="t-risk"><option value="0.5">0.5% of account</option><option value="1" selected>1% of account</option><option value="2">2% of account</option></select></label>
+            <label for="t-shares">Shares<input id="t-shares" type="number" min="1" step="1" inputmode="numeric"></label>
+            <label for="t-stop">Stop price<input id="t-stop" type="number" min="0" step="0.01" inputmode="decimal"></label>
+            <label for="t-target">Target price<input id="t-target" type="number" min="0" step="0.01" inputmode="decimal"></label>
+            <label for="t-note">Why this trade? (optional)<input id="t-note" type="text" maxlength="140" placeholder="Pullback to the 10-day average"></label>
+            <div style="grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn alt sm" id="t-size" type="button">Size to my risk</button>
+              <button class="btn accent" id="t-buy" type="button">Buy at market</button>
+            </div>
+          </div>
+          <div class="hint mono" id="t-summary"></div>
+          <div class="msg" id="t-msg" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="row" style="align-items:center">
+          <button class="btn" id="next" type="button">Advance one session</button>
+          <span class="hint">Moves every price forward one trading day. Stops and targets fill automatically.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px">Open positions</h3>
+      <div class="tablebox" id="positions"></div>
+    </div>
+    <div class="card">
+      <div class="dh" style="margin-bottom:10px"><h3>Recent closed trades</h3><span id="reset-wrap"><button class="btn alt sm" id="reset" type="button">Reset account</button></span></div>
+      <div class="tablebox" id="history"></div>
+      <p style="margin-top:12px"><a href="#journal"><b>Open the journal</b></a> for notes and stats on every trade.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CALCULATOR -->
+<section class="page" id="page-calculator">
+  <div class="stack" style="gap:24px">
+    <div><span class="eyebrow">Position sizing</span><h2 style="margin-top:6px">How many shares fit your risk?</h2>
+      <p class="hint" style="margin-top:10px;max-width:46em">Decide what a stop-out may cost, then let the math pick the share count. Put the stop below entry for a long trade or above entry for a short. Starting values are an example.</p></div>
+    <div class="calc">
+      <div class="card fields">
+        <label for="c-acct">Account size ($)<input id="c-acct" type="number" value="25000" min="0" step="100"></label>
+        <label for="c-risk">Risk per trade (%)<input id="c-risk" type="number" value="1" min="0" step="0.1"></label>
+        <label for="c-entry">Entry price<input id="c-entry" type="number" value="109.60" min="0" step="0.01"></label>
+        <label for="c-stop">Stop price<input id="c-stop" type="number" value="106.80" min="0" step="0.01"></label>
+        <label for="c-target" style="grid-column:1/-1">Target price<input id="c-target" type="number" value="117.00" min="0" step="0.01"></label>
+      </div>
+      <div class="card out" id="calc-out" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- LEARN -->
+<section class="page" id="page-learn">
+  <div class="stack" style="gap:24px">
+    <div><span class="eyebrow">Swing trading basics</span><h2 style="margin-top:6px">Short lessons, no jargon</h2></div>
+    <div class="learn">
+      <details open><summary>What is swing trading?</summary><p>Swing traders hold a stock for a few days to a few weeks, aiming to capture one move up inside a larger trend. It sits between day trading, where positions close the same day, and long-term investing.</p></details>
+      <details><summary>Why size by risk instead of by dollars?</summary><p>If every trade risks the same small share of your account, one loss never decides your month. Shares equal the dollars you accept losing divided by the distance between entry and stop.</p></details>
+      <details><summary>What is an R multiple?</summary><p>R is your planned loss on a trade. A trade that makes twice what you risked is +2R, and a stop-out is about -1R. Tracking R lets you compare trades of different sizes.</p></details>
+      <details><summary>What does selling short mean?</summary><p>Shorting means borrowing shares, selling them now, and buying them back later. You profit if the price falls and lose if it rises. Because a price can keep rising, a short can lose more than you put in, so a stop matters even more.</p></details>
+      <details><summary>Where should a stop go?</summary><p>Place it where the trade idea is proven wrong, such as just under the recent pullback low, then size the position to fit that distance. Moving a stop wider after entry changes your risk, so decide first.</p></details>
+      <details><summary>What should I review after a trade?</summary><p>Look at whether you followed the plan, what R you got, and how long you held. A small journal of those three answers shows patterns faster than gut feeling.</p></details>
+    </div>
+    <p class="hint" style="max-width:46em">Education only. Trading involves risk of loss, and nothing on this site is financial advice.</p>
+  </div>
+</section>
+
+<!-- JOURNAL -->
+<section class="page" id="page-journal">
+  <div class="stack" style="gap:24px">
+    <div><span class="eyebrow">Trade journal</span><h2 style="margin-top:6px">What happened, and why</h2>
+      <p class="hint" style="margin-top:10px;max-width:46em">Every trade you place lands here. Add a note while it is open and again after it closes. Notes save in this browser.</p></div>
+    <div class="card jstats" id="j-stats"></div>
+    <div class="entries" id="j-list"></div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="page" id="page-pricing">
+  <div class="stack" style="gap:28px">
+    <div><span class="eyebrow">Draft plans</span><h2 style="margin-top:6px">Start free. Grow when you are ready.</h2>
+      <p class="hint" style="margin-top:10px;max-width:46em">Plans and prices below are placeholders for review. Features marked planned are not built yet.</p></div>
+    <div class="plans">
+      <div class="card plan">
+        <h3>Practice</h3><div class="price">$0 <small>forever</small></div>
+        <ul><li>$25,000 paper account</li><li>Long and short trades</li><li>Trade journal with notes</li><li>Risk calculator and lessons</li></ul>
+        <a class="btn alt" href="#trade">Start practicing</a>
+      </div>
+      <div class="card plan feat">
+        <span class="pill" style="align-self:flex-start;background:var(--accent);color:var(--on-accent)">Most popular</span>
+        <h3>Trader</h3><div class="price">$12 <small>per month, draft price</small></div>
+        <ul><li>Everything in Practice</li><li>Several paper accounts (planned)</li><li>Price alerts (planned)</li><li>Journal stats by setup (planned)</li></ul>
+        <button class="btn accent" type="button" data-scroll="wl-form">Join the waitlist</button>
+      </div>
+      <div class="card plan">
+        <h3>Pro</h3><div class="price">$29 <small>per month, draft price</small></div>
+        <ul><li>Everything in Trader</li><li>Live trading through a connected broker (planned)</li><li>Strategy backtests (planned)</li><li>Priority support</li></ul>
+        <button class="btn alt" type="button" data-scroll="wl-form">Join the waitlist</button>
+      </div>
+    </div>
+    <form class="card" id="wl-form" novalidate style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+      <h3>Get notified when paid plans open</h3>
+      <div class="wl">
+        <label for="w-email">Email<input id="w-email" type="email" autocomplete="email" placeholder="you@example.com"></label>
+        <button class="btn" type="submit">Join the waitlist</button>
+      </div>
+      <div class="msg" id="wl-msg" role="status" aria-live="polite"></div>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<footer>Dekata draft. Paper trading with simulated prices. Not financial advice, and not a broker.</footer>
+
+<script>
+(function(){
+var START=25000, KEY='dekata-v1';
+var TICKERS=[
+  {s:'LMNA',n:'Lumina Grid',p:48,d:.0016,v:.014},
+  {s:'BRTH',n:'Breathe Health',p:112,d:.0010,v:.012},
+  {s:'KELP',n:'Kelp Foods',p:27,d:.0004,v:.017},
+  {s:'OAKS',n:'Oakside Rail',p:63,d:.0013,v:.010},
+  {s:'PLUM',n:'Plum Cloud',p:184,d:.0018,v:.021},
+  {s:'WREN',n:'Wren Motors',p:39,d:-.0004,v:.019},
+  {s:'FERN',n:'Fern Pharma',p:76,d:.0009,v:.016},
+  {s:'DUSK',n:'Dusk Energy',p:54,d:-.0006,v:.018},
+  {s:'MOSS',n:'Moss Outdoor',p:33,d:.0011,v:.015},
+  {s:'PIER',n:'Pier Freight',p:91,d:.0007,v:.011},
+  {s:'ASHF',n:'Ashfield Bank',p:142,d:.0005,v:.009},
+  {s:'COVE',n:'Cove Software',p:228,d:.0014,v:.022}
+];
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+var R=rng(20261003);
+function gauss(){var u=0,v;while(!u)u=R();v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+var $=function(id){return document.getElementById(id)};
+var money=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
+var fm=function(x){return money.format(x)};
+var f2=function(x){return x.toFixed(2)};
+var sgn=function(x){return (x>=0?'+':'')+fm(x)};
+var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')};
+
+var S=null;
+function fresh(){
+  var h={};
+  TICKERS.forEach(function(t){var a=[t.p];for(var i=1;i<60;i++){a.push(a[i-1]*(1+t.d+t.v*gauss()))}h[t.s]=a.map(function(x){return Math.round(x*100)/100})});
+  return {day:0,cash:START,pos:[],closed:[],hist:h,nid:1};
+}
+try{var raw=localStorage.getItem(KEY);if(raw){var j=JSON.parse(raw);if(j&&j.hist&&j.hist.COVE)S=j}}catch(e){}
+if(!S)S=fresh();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+var sel='LMNA';
+var last=function(s){var a=S.hist[s];return a[a.length-1]};
+var tk=function(s){return TICKERS.filter(function(t){return t.s===s})[0]};
+var side=function(){return parseInt($('t-side').value,10)===-1?-1:1};
+function sma(a,n){var s=a.slice(-n);return s.reduce(function(x,y){return x+y},0)/s.length}
+function tagFor(s){
+  var a=S.hist[s],p=a[a.length-1],hi=Math.max.apply(null,a.slice(-20)),m10=sma(a,10),m30=sma(a,30);
+  if(p>=hi*.99)return 'Pressing recent highs';
+  if(p<m10&&m10>m30*0.995&&p>m30*0.97)return 'Pullback in an uptrend';
+  if(m10<m30)return 'Downtrend, shorts in play';
+  return 'Trending, no clear entry';
+}
+
+/* chart drawing */
+function drawChart(svg,data,lines,w,h){
+  var L=46,Rm=lines.length?70:16,T=12,B=24;
+  var lo=Math.min.apply(null,data),hi=Math.max.apply(null,data);
+  lines.forEach(function(l){lo=Math.min(lo,l.v);hi=Math.max(hi,l.v)});
+  var pad=(hi-lo)*.06||1;lo-=pad;hi+=pad;
+  var X=function(i){return L+(w-L-Rm)*i/(data.length-1)};
+  var Y=function(v){return T+(h-T-B)*(1-(v-lo)/(hi-lo))};
+  var o='';
+  for(var k=0;k<=3;k++){var v=lo+(hi-lo)*k/3,y=Y(v);o+='<line x1="'+L+'" x2="'+(w-Rm)+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" font-family="IBM Plex Mono,monospace" fill="var(--muted)">'+f2(v)+'</text>'}
+  var en=lines.filter(function(l){return l.k==='entry'})[0],st=lines.filter(function(l){return l.k==='stop'})[0],tg=lines.filter(function(l){return l.k==='target'})[0];
+  function zone(a,b,c){var y1=Math.min(Y(a),Y(b)),hh=Math.abs(Y(a)-Y(b));return '<rect x="'+L+'" y="'+y1+'" width="'+(w-L-Rm)+'" height="'+hh+'" fill="'+c+'" fill-opacity=".12"/>'}
+  if(en&&tg)o+=zone(en.v,tg.v,'var(--gain)');
+  if(en&&st)o+=zone(en.v,st.v,'var(--loss)');
+  var pts=data.map(function(v,i){return X(i).toFixed(1)+','+Y(v).toFixed(1)}).join(' ');
+  o+='<polyline points="'+pts+'" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+  lines.forEach(function(l){
+    var c=l.k==='stop'?'var(--loss)':l.k==='target'?'var(--gain)':'var(--muted)',y=Y(l.v);
+    o+='<line x1="'+L+'" x2="'+(w-Rm)+'" y1="'+y+'" y2="'+y+'" stroke="'+c+'" stroke-width="1.6" stroke-dasharray="5 4"/><text x="'+(w-Rm+6)+'" y="'+(y+4)+'" font-size="11" font-family="IBM Plex Mono,monospace" fill="'+c+'">'+l.t+' '+f2(l.v)+'</text>';
+  });
+  o+='<circle cx="'+X(data.length-1)+'" cy="'+Y(data[data.length-1])+'" r="5" fill="var(--accent)" stroke="var(--ink)" stroke-width="2"/>';
+  o+='<text x="'+L+'" y="'+(h-6)+'" font-size="11" fill="var(--muted)" font-family="Figtree,sans-serif">Last '+data.length+' sessions</text>';
+  svg.innerHTML=o;
+}
+
+/* hero example chart */
+(function(){
+  var d=[100,101.5,101,103,104.5,104,106,107.5,107,109,110.5,110,112,113.5,113,112,110.5,109.5,108.5,108,108.8,109.6];
+  var e=109.6,s=106.8,t=117;
+  drawChart($('hero-chart'),d,[{k:'target',v:t,t:'Target'},{k:'entry',v:e,t:'Entry'},{k:'stop',v:s,t:'Stop'}],520,280);
+  $('hero-rr').textContent=f2((t-e)/(e-s))+' to 1 reward to risk';
+})();
+
+/* account */
+function equity(){return S.cash+S.pos.reduce(function(a,p){return a+p.side*p.shares*last(p.s)},0)}
+function plOf(p,price){return p.side*p.shares*(price-p.entry)}
+function renderStats(){
+  var open=S.pos.reduce(function(a,p){return a+plOf(p,last(p.s))},0),eq=equity(),tot=eq-START;
+  var items=[['Account value',fm(eq),''],['Cash',fm(S.cash),''],['Open profit/loss',sgn(open),open>=0?'gain':'loss'],['Total vs start',sgn(tot),tot>=0?'gain':'loss']];
+  $('stats').innerHTML=items.map(function(i){return '<div class="stat"><div class="k">'+i[0]+' · day '+S.day+'</div><div class="v '+i[2]+'">'+i[1]+'</div></div>'}).join('');
+}
+function renderMarket(){
+  $('market').innerHTML=TICKERS.map(function(t){
+    var a=S.hist[t.s],p=a[a.length-1],pv=a[a.length-2],ch=(p/pv-1)*100;
+    return '<button class="mk" type="button" data-sym="'+t.s+'" aria-pressed="'+(t.s===sel)+'"><span class="t">'+t.s+'</span><span class="pr mono">'+f2(p)+'</span><span class="nm">'+t.n+'</span><span class="pr mono '+(ch>=0?'gain':'loss')+'" style="font-size:.8rem">'+(ch>=0?'+':'')+ch.toFixed(2)+'%</span><span class="tag">'+tagFor(t.s)+'</span></button>';
+  }).join('');
+}
+function posOf(s){return S.pos.filter(function(p){return p.s===s})[0]}
+function validLevels(sd,p,st,tg){return sd>0?(st<p&&tg>p):(st>p&&tg<p)}
+function renderDetail(){
+  var t=tk(sel),p=last(sel),pos=posOf(sel),sd=side();
+  $('sel-name').textContent=sel+' · '+t.n;
+  $('sel-tag').textContent=tagFor(sel);
+  $('sel-price').textContent=f2(p);
+  var lines=[];
+  if(pos){lines=[{k:'target',v:pos.target,t:'Target'},{k:'entry',v:pos.entry,t:'Entry'},{k:'stop',v:pos.stop,t:'Stop'}]}
+  else{var st=parseFloat($('t-stop').value),tg=parseFloat($('t-target').value);if(st>0&&tg>0&&validLevels(sd,p,st,tg))lines=[{k:'target',v:tg,t:'Target'},{k:'entry',v:p,t:'Entry'},{k:'stop',v:st,t:'Stop'}]}
+  drawChart($('chart'),S.hist[sel].slice(-40),lines,640,270);
+  var held=!!pos;
+  $('t-buy').disabled=held;$('t-buy').textContent=held?'Position open':(sd>0?'Buy at market':'Sell short at market');
+  ['t-shares','t-stop','t-target','t-size','t-risk','t-side','t-note'].forEach(function(i){$(i).disabled=held});
+  updateSummary();
+}
+function defaults(){
+  var p=last(sel),sd=side();
+  $('t-stop').value=f2(p*(sd>0?.97:1.03));$('t-target').value=f2(p*(sd>0?1.07:.93));
+  sizeShares();
+}
+function sizeShares(){
+  var p=last(sel),st=parseFloat($('t-stop').value),risk=equity()*parseFloat($('t-risk').value)/100,d=Math.abs(p-st);
+  if(d>0){var n=Math.floor(risk/d),maxN=Math.floor(S.cash/p);$('t-shares').value=Math.max(0,Math.min(n,maxN))}
+}
+function updateSummary(){
+  var p=last(sel),n=parseInt($('t-shares').value,10),st=parseFloat($('t-stop').value),tg=parseFloat($('t-target').value);
+  if(posOf(sel)){$('t-summary').textContent='You already hold '+sel+'. Close it below to open a new trade.';return}
+  if(!(n>0&&st>0&&tg>0)){$('t-summary').textContent='Enter shares, stop and target.';return}
+  var risk=n*Math.abs(p-st),rew=n*Math.abs(tg-p);
+  $('t-summary').textContent='Value '+fm(n*p)+'  ·  Risk '+fm(risk)+' ('+(risk/equity()*100).toFixed(2)+'%)  ·  Reward '+fm(rew)+'  ·  '+(risk>0?f2(rew/risk):'0.00')+' to 1';
+}
+function msg(t,c){var m=$('t-msg');m.textContent=t;m.className='msg '+(c||'')}
+function openTrade(){
+  var p=last(sel),sd=side(),n=parseInt($('t-shares').value,10),st=parseFloat($('t-stop').value),tg=parseFloat($('t-target').value);
+  if(!(n>0))return msg('Enter a share count above zero.','loss');
+  if(sd>0){
+    if(!(st<p))return msg('For a long trade, the stop must sit below the current price of '+f2(p)+'.','loss');
+    if(!(tg>p))return msg('For a long trade, the target must sit above the current price of '+f2(p)+'.','loss');
+  }else{
+    if(!(st>p))return msg('For a short trade, the stop must sit above the current price of '+f2(p)+'.','loss');
+    if(!(tg<p&&tg>0))return msg('For a short trade, the target must sit below the current price of '+f2(p)+'.','loss');
+  }
+  if(n*p>S.cash)return msg('Not enough cash. The most you can open here is '+Math.floor(S.cash/p)+' shares.','loss');
+  if(sd>0)S.cash-=n*p;else S.cash+=n*p;
+  S.pos.push({id:S.nid++,s:sel,side:sd,shares:n,entry:p,stop:st,target:tg,day:S.day,note:$('t-note').value.trim()});
+  $('t-note').value='';
+  save();msg((sd>0?'Bought ':'Sold short ')+n+' '+sel+' at '+f2(p)+'.','gain');renderAll();
+}
+function closePos(s,price,reason){
+  var i=S.pos.map(function(p){return p.s}).indexOf(s);if(i<0)return;
+  var p=S.pos.splice(i,1)[0];
+  if(p.side>0)S.cash+=p.shares*price;else S.cash-=p.shares*price;
+  var pnl=plOf(p,price),r=p.side*(price-p.entry)/Math.abs(p.entry-p.stop);
+  S.closed.unshift({id:p.id,s:s,side:p.side,shares:p.shares,entry:p.entry,exit:price,reason:reason,pnl:pnl,r:r,days:S.day-p.day,note:p.note||''});
+  if(S.closed.length>60)S.closed.length=60;
+}
+function advance(){
+  TICKERS.forEach(function(t){var a=S.hist[t.s],p=a[a.length-1];a.push(Math.round(p*(1+t.d+t.v*gauss())*100)/100);if(a.length>120)a.shift()});
+  S.day++;
+  var before=S.pos.length;
+  S.pos.slice().forEach(function(p){
+    var pr=last(p.s);
+    if(p.side>0){if(pr<=p.stop)closePos(p.s,pr,'Stop hit');else if(pr>=p.target)closePos(p.s,pr,'Target hit')}
+    else{if(pr>=p.stop)closePos(p.s,pr,'Stop hit');else if(pr<=p.target)closePos(p.s,pr,'Target hit')}
+  });
+  var n=before-S.pos.length;
+  save();msg('Advanced to day '+S.day+'.'+(n?' '+n+' trade'+(n>1?'s':'')+' closed automatically.':''));renderAll();
+}
+var sidePill=function(sd){return '<span class="pill">'+(sd>0?'Long':'Short')+'</span>'};
+function renderTables(){
+  if(!S.pos.length)$('positions').innerHTML='<div class="empty">No open positions. Pick a stock and place a trade above.</div>';
+  else $('positions').innerHTML='<table><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Entry</th><th>Now</th><th>Stop</th><th>Target</th><th>Profit/loss</th><th>Days</th><th></th></tr></thead><tbody>'+S.pos.map(function(p){
+    var now=last(p.s),pl=plOf(p,now);
+    return '<tr><td><b>'+p.s+'</b></td><td>'+sidePill(p.side)+'</td><td class="mono">'+p.shares+'</td><td class="mono">'+f2(p.entry)+'</td><td class="mono">'+f2(now)+'</td><td class="mono loss">'+f2(p.stop)+'</td><td class="mono gain">'+f2(p.target)+'</td><td class="mono '+(pl>=0?'gain':'loss')+'">'+sgn(pl)+'</td><td class="mono">'+(S.day-p.day)+'</td><td><button class="btn alt sm" data-close="'+p.s+'" type="button">Close</button></td></tr>'}).join('')+'</tbody></table>';
+  if(!S.closed.length)$('history').innerHTML='<div class="empty">Closed trades appear here with their R multiple.</div>';
+  else $('history').innerHTML='<table><thead><tr><th>Stock</th><th>Side</th><th>Entry</th><th>Exit</th><th>How</th><th>Profit/loss</th><th>R</th><th>Days</th></tr></thead><tbody>'+S.closed.slice(0,5).map(function(c){
+    return '<tr><td><b>'+c.s+'</b></td><td>'+sidePill(c.side)+'</td><td class="mono">'+f2(c.entry)+'</td><td class="mono">'+f2(c.exit)+'</td><td><span class="pill">'+c.reason+'</span></td><td class="mono '+(c.pnl>=0?'gain':'loss')+'">'+sgn(c.pnl)+'</td><td class="mono '+(c.r>=0?'gain':'loss')+'">'+(c.r>=0?'+':'')+c.r.toFixed(2)+'R</td><td class="mono">'+c.days+'</td></tr>'}).join('')+'</tbody></table>';
+}
+
+/* journal */
+function noteBox(id,kind,note){
+  return '<label for="jn-'+id+'">Notes<textarea id="jn-'+id+'" data-kind="'+kind+'" data-id="'+id+'" rows="3" maxlength="400" placeholder="What was the idea, and what would you do differently?">'+esc(note)+'</textarea></label>';
+}
+function renderJournal(){
+  var c=S.closed,n=c.length;
+  if(n){
+    var wins=c.filter(function(x){return x.pnl>0}).length,tot=c.reduce(function(a,x){return a+x.pnl},0),ar=c.reduce(function(a,x){return a+x.r},0)/n,ad=c.reduce(function(a,x){return a+x.days},0)/n;
+    var it=[['Closed trades',String(n),''],['Win rate',Math.round(wins/n*100)+'%',''],['Average R',(ar>=0?'+':'')+ar.toFixed(2)+'R',ar>=0?'gain':'loss'],['Total profit/loss',sgn(tot),tot>=0?'gain':'loss'],['Average hold',ad.toFixed(1)+' days','']];
+    $('j-stats').innerHTML=it.map(function(i){return '<div class="stat"><div class="k">'+i[0]+'</div><div class="v '+i[2]+'">'+i[1]+'</div></div>'}).join('');
+  }else $('j-stats').innerHTML='<div class="empty" style="grid-column:1/-1">Stats appear after your first closed trade.</div>';
+  var h='';
+  S.pos.forEach(function(p){
+    var pl=plOf(p,last(p.s));
+    h+='<div class="card entry"><div class="eh"><div><b>'+p.s+'</b> '+sidePill(p.side)+' <span class="pill">Open</span></div><div class="mono '+(pl>=0?'gain':'loss')+'">'+sgn(pl)+'</div></div><div class="hint mono">Entry '+f2(p.entry)+' · Stop '+f2(p.stop)+' · Target '+f2(p.target)+' · day '+(S.day-p.day)+'</div>'+noteBox(p.id,'open',p.note)+'</div>';
+  });
+  c.forEach(function(x){
+    h+='<div class="card entry"><div class="eh"><div><b>'+x.s+'</b> '+sidePill(x.side)+' <span class="pill">'+x.reason+'</span></div><div class="mono '+(x.pnl>=0?'gain':'loss')+'">'+sgn(x.pnl)+' · '+(x.r>=0?'+':'')+x.r.toFixed(2)+'R</div></div><div class="hint mono">Entry '+f2(x.entry)+' → exit '+f2(x.exit)+' · '+x.days+' days · '+x.shares+' shares</div>'+noteBox(x.id,'closed',x.note)+'</div>';
+  });
+  if(!S.pos.length&&!n)h='<div class="card entry" style="opacity:.85"><div class="eh"><div><b>EXAMPLE</b> <span class="pill">Long</span> <span class="pill">Target hit</span></div><div class="mono gain">+$412.00 · +1.9R</div></div><div class="hint mono">Entry 109.60 → exit 117.00 · 6 days · 55 shares</div><p class="hint">Pullback to the 10-day average. I waited for the bounce, kept the stop where planned, and sold at the target without tinkering.</p><div class="hint">Example entry. Your own trades will show up here, each with a notes box.</div></div>';
+  $('j-list').innerHTML=h;
+}
+$('j-list').addEventListener('input',function(e){
+  var t=e.target;if(!t.matches||!t.matches('textarea'))return;
+  var id=parseInt(t.getAttribute('data-id'),10),arr=t.getAttribute('data-kind')==='open'?S.pos:S.closed;
+  for(var i=0;i<arr.length;i++){if(arr[i].id===id){arr[i].note=t.value;break}}
+  save();
+});
+function renderAll(){renderStats();renderMarket();renderDetail();renderTables();renderJournal()}
+
+/* events */
+$('market').addEventListener('click',function(e){var b=e.target.closest('[data-sym]');if(!b)return;sel=b.getAttribute('data-sym');msg('');defaults();renderMarket();renderDetail()});
+$('positions').addEventListener('click',function(e){var b=e.target.closest('[data-close]');if(!b)return;var s=b.getAttribute('data-close');closePos(s,last(s),'Closed by you');save();msg('Closed '+s+' at '+f2(last(s))+'.');renderAll()});
+$('t-buy').addEventListener('click',openTrade);
+$('next').addEventListener('click',advance);
+$('t-size').addEventListener('click',function(){sizeShares();updateSummary()});
+$('t-risk').addEventListener('change',function(){sizeShares();updateSummary()});
+$('t-side').addEventListener('change',function(){msg('');defaults();renderDetail()});
+['t-shares','t-stop','t-target'].forEach(function(i){$(i).addEventListener('input',function(){updateSummary();if(i!=='t-shares')renderDetail()})});
+var resetBtn='<button class="btn alt sm" id="reset" type="button">Reset account</button>';
+$('reset-wrap').addEventListener('click',function(e){
+  if(e.target.id==='reset'){
+    $('reset-wrap').innerHTML='<span class="hint">Erase all trades and notes, restart with $25,000? </span><button class="btn sm" id="reset-yes" type="button">Yes, reset</button> <button class="btn alt sm" id="reset-no" type="button">Cancel</button>';
+  }else if(e.target.id==='reset-yes'){
+    S=fresh();save();sel='LMNA';$('t-side').value='1';defaults();msg('Account reset.');renderAll();
+    $('reset-wrap').innerHTML=resetBtn;
+  }else if(e.target.id==='reset-no'){
+    $('reset-wrap').innerHTML=resetBtn;
+  }
+});
+
+/* calculator (long or short, by where the stop sits) */
+function calc(){
+  var a=parseFloat($('c-acct').value),rp=parseFloat($('c-risk').value),en=parseFloat($('c-entry').value),st=parseFloat($('c-stop').value),tg=parseFloat($('c-target').value),o=$('calc-out');
+  if(!(a>0&&rp>0&&en>0&&st>0&&tg>0)){o.innerHTML='<p class="hint">Fill in every field with a number above zero.</p>';return}
+  if(st===en){o.innerHTML='<p class="hint">The stop must differ from the entry price.</p>';return}
+  var lng=st<en;
+  if(lng&&!(tg>en)){o.innerHTML='<p class="hint">With a stop below entry (a long trade), the target must sit above entry.</p>';return}
+  if(!lng&&!(tg<en)){o.innerHTML='<p class="hint">With a stop above entry (a short trade), the target must sit below entry.</p>';return}
+  var riskAmt=a*rp/100,per=Math.abs(en-st),n=Math.floor(riskAmt/per),cost=n*en,capped=false;
+  if(cost>a){n=Math.floor(a/en);cost=n*en;capped=true}
+  var risk=n*per,rew=n*Math.abs(tg-en),rr=Math.abs(tg-en)/per,tot=risk+rew||1;
+  o.innerHTML='<div><div class="eyebrow">'+(lng?'Buy':'Sell short')+'</div><div class="big">'+n.toLocaleString('en-US')+' <span style="font-size:1.1rem;font-weight:600">shares</span></div></div>'+
+  '<div class="rr" aria-hidden="true"><i style="width:'+(risk/tot*100)+'%;background:var(--loss)"></i><i style="width:'+(rew/tot*100)+'%;background:var(--gain)"></i></div>'+
+  '<div class="kv mono"><span>Position value</span><span>'+fm(cost)+' ('+(cost/a*100).toFixed(1)+'% of account)</span><span>Money at risk</span><span class="loss">'+fm(risk)+'</span><span>Money to gain</span><span class="gain">'+fm(rew)+'</span><span>Reward to risk</span><span>'+f2(rr)+' to 1</span></div>'+
+  (capped?'<p class="hint">Capped by account size. The stop is tighter than your risk limit needs.</p>':'');
+}
+['c-acct','c-risk','c-entry','c-stop','c-target'].forEach(function(i){$(i).addEventListener('input',calc)});
+
+/* pricing waitlist */
+$('wl-form').addEventListener('submit',function(e){
+  e.preventDefault();
+  var v=$('w-email').value.trim(),m=$('wl-msg');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){m.textContent='Enter an email address like name@example.com.';m.className='msg loss';return}
+  m.textContent='That looks good. This draft cannot save emails yet, so nothing was sent.';m.className='msg';
+});
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-scroll]');if(!b)return;
+  var el=$(b.getAttribute('data-scroll'));if(el){el.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){var i=$('w-email');if(i)i.focus({preventScroll:true})},350)}
+});
+
+/* router */
+var pages=['home','trade','journal','calculator','learn','pricing'];
+function route(){
+  var h=(location.hash||'').replace('#','');if(pages.indexOf(h)<0)h='home';
+  pages.forEach(function(p){$('page-'+p).classList.toggle('on',p===h)});
+  document.querySelectorAll('[data-nav]').forEach(function(a){if(a.getAttribute('data-nav')===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+
+defaults();renderAll();calc();route();
+})();
+
+</script>
+
+</body>
+</html>
